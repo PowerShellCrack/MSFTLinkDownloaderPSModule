@@ -7,7 +7,7 @@ A module that will download files from Microsoft Link ID's
 None
 
 ## Cmdlets
-- Get-LocalPolicySystemSettings - Retrieves all system policies
+- **Get-MicrosoftProduct** - Downloads file from linkID
 
 ## Install
 
