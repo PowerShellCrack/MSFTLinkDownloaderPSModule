@@ -167,7 +167,7 @@ Function Initialize-FileDownload {
 
 # MICROSOFT DOWNLOAD
 #==================================================
-function Get-MicrosoftProduct {
+function Get-MSFTLink {
     <#
         .SYNOPSIS
         Retrieves File from Microsoft
@@ -206,25 +206,25 @@ function Get-MicrosoftProduct {
         Export downloaded information as object
 
         .EXAMPLE
-        Get-MicrosoftProduct -LinkID '49117' -DestPath C:\temp\Downloads -Force
+        Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force
 
         .EXAMPLE
-        Get-MicrosoftProduct -LinkID '55319' -DestPath C:\temp\Downloads -Filter 'LGPO'
+        Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Filter 'LGPO'
 
         .EXAMPLE
-        Get-MicrosoftProduct -LinkID '49117' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
+        Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
 
         .EXAMPLE
-        Get-MicrosoftProduct -LinkID '55319' -DestPath C:\temp\Downloads -Passthru
+        Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Passthru
 
         .EXAMPLE
-        49117,55319,104223 | Get-MicrosoftProduct -DestPath C:\temp\Downloads -Passthru
+        49117,55319,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru
 
         .EXAMPLE
-        49117,104223 | Get-MicrosoftProduct -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup
+        49117,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup
 
         .EXAMPLE
-        '55319' | Get-MicrosoftProduct -DestPath C:\temp\Downloads -Filter 'Windows Server' -Passthru -Extract -Verbose
+        '55319' | Get-MSFTLink -DestPath C:\temp\Downloads -Filter 'Windows Server' -Passthru -Extract -Verbose
 
         .LINK
         Get-HrefMatches
@@ -266,9 +266,6 @@ function Get-MicrosoftProduct {
         [string]$DownloadURL = "https://download.microsoft.com/download"
 
         $DownloadData = @()
-        <#
-        $LinkID = '49117'
-        #>
     }
     Process
     {
@@ -379,7 +376,7 @@ function Get-MicrosoftProduct {
 
 $exportModuleMemberParams = @{
     Function = @(
-        'Get-MicrosoftProduct'
+        'Get-MSFTLink'
     )
 }
 
