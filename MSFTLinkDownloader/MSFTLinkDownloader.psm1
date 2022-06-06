@@ -90,10 +90,10 @@ Function Initialize-FileDownload {
          [Alias("Title")]
          [string]$Name,
 
-         [Parameter(Mandatory=$true,Position=1)]
+         [Parameter(Mandatory=$true,Position=0)]
          [string]$Url,
 
-         [Parameter(Mandatory=$true,Position=2)]
+         [Parameter(Mandatory=$true,Position=1)]
          [Alias("TargetDest")]
          [string]$TargetFile
      )
@@ -157,7 +157,7 @@ Function Initialize-FileDownload {
     End{
         #Write-Progress -activity "Finished downloading file '$($url.split('/') | Select-Object -Last 1)'"
         If($Name){$Label = $Name}Else{$Label = $ChildURLPath}
-        Write-Progress -Activity ("Finished downloading file: {0}" -f $Label) -PercentComplete 100 -Completed
+        Write-Progress -Activity ("Finished downloading file: {0}" -f $Label) -Completed
         #change meta in file from internet to allow to run on system
         If(Test-Path $TargetFile){Unblock-File $TargetFile -ErrorAction SilentlyContinue | Out-Null}
     }
@@ -232,16 +232,16 @@ function Get-MSFTLink {
     #>
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true,Position=1,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
         [string[]]$LinkID,
 
-        [parameter(Mandatory=$false)]
+        [parameter(Mandatory=$false,Position=1)]
         [string]$Filter,
 
         [ValidateSet('en-us','en-gb','en-sg','en-au')]
         [string]$Language = "en-us",
 
-        [parameter(Mandatory=$true)]
+        [parameter(Mandatory=$true,Position=2)]
         [string]$DestPath,
 
         [Parameter(Mandatory=$false,ParameterSetName='Archive')]
