@@ -199,7 +199,7 @@ function Get-ZipFileSize {
 
 # MICROSOFT DOWNLOAD
 #==================================================
-function Get-MSFTLink {
+function Get-MsftLink {
     <#
         .SYNOPSIS
         Retrieves File from Microsoft
@@ -220,13 +220,13 @@ function Get-MSFTLink {
         Defaults to en-US. English.
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '49117','104223'
+        Get-MsftLink -LinkID '49117','104223'
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '55319' -Filter 'LGPO'
+        Get-MsftLink -LinkID '55319' -Filter 'LGPO'
 
         .EXAMPLE
-        49117,55319,104223 | Get-MSFTLink -Language en-gb
+        49117,55319,104223 | Get-MsftLink -Language en-gb
 
         .LINK
         Get-HrefMatches
@@ -319,7 +319,7 @@ Function Invoke-MsftLinkDownload {
         Defaults to en-US. English.
 
         .PARAMETER DownloadLink
-        Required. download url )usually obtained by Get-MSFTLink
+        Required. download url )usually obtained by Get-MsftLink
 
         .PARAMETER Extract
         Attempts to extract zip files or extractable exe files
@@ -352,14 +352,14 @@ Function Invoke-MsftLinkDownload {
         Invoke-MsftLinkDownload -DownloadLink 'https://download.microsoft.com/download/8/5/C/85C25433-A1B0-4FFA-9429-7E023E7DA8D8/LGPO.zip' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
 
         .EXAMPLE
-        Get-MSFTLink -LinkID 49117,104223 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
+        Get-MsftLink -LinkID 49117,104223 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
 
         .EXAMPLE
-        $Links = Get-MSFTLink -LinkID 49117,55319,104223
+        $Links = Get-MsftLink -LinkID 49117,55319,104223
         $Links | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup -verbose
 
         .LINK
-        Get-MSFTLink
+        Get-MsftLink
         Initialize-FileDownload
         Get-UncompressedZipFileSize
     #>
@@ -417,7 +417,7 @@ Function Invoke-MsftLinkDownload {
                 $MSFTLinkParams += @{Language = $Language}
             }
             Write-Verbose ("{0} : Attempting to get links: [{1}]..." -f ${CmdletName},($LinkID -join ','))
-            $DownloadLink = Get-MSFTLink @MSFTLinkParams | Select -ExpandProperty DownloadLink
+            $DownloadLink = Get-MsftLink @MSFTLinkParams | Select -ExpandProperty DownloadLink
         }
 
         $DownloadCollection = @()
@@ -514,7 +514,7 @@ Function Invoke-MsftLinkDownload {
 
 $exportModuleMemberParams = @{
     Function = @(
-        'Get-MSFTLink'
+        'Get-MsftLink'
         'Invoke-MsftLinkDownload'
     )
 }
