@@ -7,7 +7,8 @@ A module that will download files from Microsoft Link ID's
 None
 
 ## Cmdlets
-- **Get-MSFTLink** - Downloads file from linkID
+- **Get-MSFTLink** - Get the download url from linkID; export to object
+- **Invoke-MSFTLinkDownload** - Downloads file from linkID
 
 ## Install
 
@@ -19,26 +20,28 @@ Import-Module MSFTLinkDownloader
 ## Examples
 
 ```powershell
-.EXAMPLE
-Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force
 
-.EXAMPLE
-Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Filter 'LGPO'
+#grab linkID download URLS
+Get-MSFTLink -LinkID '49117'
 
-.EXAMPLE
-Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
+#grab linkID download URLS with LGPO in name
+Get-MSFTLink -LinkID '55319' -Filter 'LGPO'
 
-.EXAMPLE
-Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Passthru
+#grab linkID download URLS for British english language
+49117,55319,104223 | Get-MSFTLink -Language en-gb
 
-.EXAMPLE
-49117,55319,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru
+#download file by Link ID with Server in name (overwrite if exists)
+Invoke-MsftLinkDownload -LinkID 55319,104223 -Filter 'Server' -DestPath C:\temp\Downloads -Force
 
-.EXAMPLE
-49117,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup
+#download file by URL (overwrite if exists)
+Invoke-MsftLinkDownload -DownloadLink 'https://download.microsoft.com/download/8/5/C/85C25433-A1B0-4FFA-9429-7E023E7DA8D8/LGPO.zip' -DestPath C:\temp\Downloads -Force
 
-.EXAMPLE
-'55319' | Get-MSFTLink -DestPath C:\temp\Downloads -Filter 'Windows Server' -Passthru -Extract -Verbose
+#grab linkID download URLS, then download them and export their status
+Get-MSFTLink -LinkID 49117,104223 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
+
+#collect linkID data, then download them, show no progress bar and extract them if they are archive files as well a delete the archive when done.
+$Links = Get-MSFTLink -LinkID 49117,55319,104223
+$Links | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup
 
 ```
 

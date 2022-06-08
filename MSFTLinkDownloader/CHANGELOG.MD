@@ -1,8 +1,9 @@
 # Change log for MSFTLinkDownloader module
 
-## 1.0.0.3 June 07, 2022
+## 1.0.0.3 June 08, 2022
 
 - Changed Get-MSFTLink to just link retrieval; replaced with Invoke-MSFTLinkDownload
+- Added pipeline from  Get-MSFTLink to Invoke-MSFTLinkDownload; simplifies download
 
 ## 1.0.0.2 June 06, 2022
 
