@@ -83,6 +83,7 @@ Function Get-WebContentHeader{
         default          {Return $resultTable}
     }
 }
+
 Function Initialize-FileDownload {
     [CmdletBinding()]
     param(
@@ -162,8 +163,39 @@ Function Initialize-FileDownload {
         If(Test-Path $TargetFile){Unblock-File $TargetFile -ErrorAction SilentlyContinue | Out-Null}
     }
 
- }
+}
 
+function Get-ZipFileSize {
+
+    param (
+        [ValidateScript({Get-item $_ -Include '*.zip'})]
+        $Path
+    )
+    $ZipSize = (Get-item $path).length/1kb
+
+    #open zip using explorer to unzip
+    $shell = New-Object -ComObject shell.application
+    $zip = $shell.NameSpace($Path)
+    $size = 0
+    foreach ($item in $zip.items()) {
+        if ($item.IsFolder) {
+            $size += Get-UncompressedZipFileSize -Path $item.Path
+        } else {
+            $size += $item.size
+        }
+    }
+
+    # It might be a good idea to dispose the COM object now explicitly, see comments below
+    [System.Runtime.InteropServices.Marshal]::ReleaseComObject([System.__ComObject]$shell) | Out-Null
+    [System.GC]::Collect()
+    [System.GC]::WaitForPendingFinalizers()
+
+    $Zipdata = '' | Select ZippedKbSize,UnzippedKbSize
+    $Zipdata.ZippedKbSize = ("{0:F2}" -f $ZipSize)
+    $Zipdata.UnzippedKbSize = ("{0:F2}" -f ($size/1kb))
+
+    return $Zipdata
+}
 
 # MICROSOFT DOWNLOAD
 #==================================================
@@ -187,6 +219,108 @@ function Get-MSFTLink {
         .PARAMETER Language
         Defaults to en-US. English.
 
+        .EXAMPLE
+        Get-MSFTLink -LinkID '49117','104223'
+
+        .EXAMPLE
+        Get-MSFTLink -LinkID '55319' -Filter 'LGPO'
+
+        .EXAMPLE
+        49117,55319,104223 | Get-MSFTLink -Language en-gb
+
+        .LINK
+        Get-HrefMatches
+    #>
+    [CmdletBinding()]
+    [OutputType([PSCustomObject])]
+    param(
+        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        [int[]]$LinkID,
+
+        [parameter(Mandatory=$false,Position=1)]
+        [string]$Filter,
+
+        [ValidateSet('en-us','en-gb','en-sg','en-au')]
+        [string]$Language = "en-us"
+	)
+    Begin{
+        ## Get the name of this function
+        [string]${CmdletName} = $PSCmdlet.MyInvocation.MyCommand.Name
+
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+        [System.Uri]$SourceURL = "https://www.microsoft.com/$Language/download"
+        [string]$DownloadURL = "https://download.microsoft.com/download"
+
+        $LinkCollection = @()
+    }
+    Process
+    {
+        Foreach($ID in $LinkID){
+            Try{
+                ## -------- FIND FILE LINKS ----------
+                $ConfirmationLink = $SourceURL.OriginalString + "/confirmation.aspx?id=$ID"
+                Write-Verbose ("{0} : Grabbing links from [{1}]..." -f ${CmdletName},$ConfirmationLink)
+
+                $ConfirmationContent = Invoke-WebRequest $ConfirmationLink -UseBasicParsing -ErrorAction Stop
+                $OfficialDownloads = Get-HrefMatches -content [string]$ConfirmationContent  | Where-Object {$_ -match $DownloadURL} | Select-Object -Unique
+
+                #Filter
+                If($Filter){
+                    $OfficialDownloads = $OfficialDownloads | Where-Object {$_ -like "*$Filter*"}
+                    Write-Verbose ("{0} : Found {1} official downloadable links with filter [{2}]" -f ${CmdletName},$OfficialDownloads.Count,$Filter)
+                }Else{
+                    Write-Verbose ("{0} : Found {1} official downloadable links" -f ${CmdletName},$OfficialDownloads.Count)
+                }
+
+                #TESTS $link = $OfficialDownloads[0]
+                Foreach($link in $OfficialDownloads)
+                {
+                    #Build collection object
+                    $Data = '' | Select LinkID,DownloadLink,FileName
+                    $Data.LinkID = $ConfirmationLink
+                    $Data.DownloadLink = $link
+
+                    $Filename = $link | Split-Path -Leaf
+                    $Data.FileName = $Filename
+
+                    #add data to array
+                    $LinkCollection += $Data
+                } #end loop
+            }
+            catch {
+                Write-Error ("{0} : Unable to download [{1}]. {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
+            }
+        }
+    }
+    End{
+        return $LinkCollection
+    }
+}
+
+Function Invoke-MsftLinkDownload {
+    <#
+        .SYNOPSIS
+        Retrieves File from Microsoft
+
+        .DESCRIPTION
+        Download files from Microsoft download site using LinkID
+
+        .NOTES
+        Created by: @PowershellCrack
+
+        .PARAMETER LinkID
+        Required. Link id from download url
+
+        .PARAMETER Filter
+        Filter to reduce files found in link
+
+        .PARAMETER Language
+        Defaults to en-US. English.
+
+        .PARAMETER DownloadLink
+        Required. download url )usually obtained by Get-MSFTLink
+
         .PARAMETER Extract
         Attempts to extract zip files or extractable exe files
 
@@ -206,48 +340,59 @@ function Get-MSFTLink {
         Export downloaded information as object
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force
+        Invoke-MsftLinkDownload -LinkID 49117 -DestPath C:\temp\Downloads -Force
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Filter 'LGPO'
+        Invoke-MsftLinkDownload -LinkID 55319,104223 -Filter 'Server' -DestPath C:\temp\Downloads -Force -verbose
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '49117' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
+        Invoke-MsftLinkDownload -DownloadLink 'https://download.microsoft.com/download/8/5/C/85C25433-A1B0-4FFA-9429-7E023E7DA8D8/LGPO.zip' -DestPath C:\temp\Downloads -Force
 
         .EXAMPLE
-        Get-MSFTLink -LinkID '55319' -DestPath C:\temp\Downloads -Passthru
+        Invoke-MsftLinkDownload -DownloadLink 'https://download.microsoft.com/download/8/5/C/85C25433-A1B0-4FFA-9429-7E023E7DA8D8/LGPO.zip' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
 
         .EXAMPLE
-        49117,55319,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru
+        Get-MSFTLink -LinkID 49117,104223 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
 
         .EXAMPLE
-        49117,104223 | Get-MSFTLink -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup
-
-        .EXAMPLE
-        '55319' | Get-MSFTLink -DestPath C:\temp\Downloads -Filter 'Windows Server' -Passthru -Extract -Verbose
+        $Links = Get-MSFTLink -LinkID 49117,55319,104223
+        $Links | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru -NoProgress -Extract -Cleanup -verbose
 
         .LINK
-        Get-HrefMatches
+        Get-MSFTLink
         Initialize-FileDownload
+        Get-UncompressedZipFileSize
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='URL')]
     param(
-        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
-        [string[]]$LinkID,
+        [Parameter(Mandatory=$true,Position=0,ParameterSetName='ID')]
+        [int[]]$LinkID,
 
-        [parameter(Mandatory=$false,Position=1)]
+        [Parameter(Mandatory=$false,ParameterSetName='ID')]
         [string]$Filter,
 
+        [Parameter(Mandatory=$false, ParameterSetName='ID')]
         [ValidateSet('en-us','en-gb','en-sg','en-au')]
         [string]$Language = "en-us",
 
-        [parameter(Mandatory=$true,Position=2)]
+        [Parameter(Mandatory=$true,
+                    Position=0,
+                    ValueFromPipeline=$true,
+                    ValueFromPipelineByPropertyName=$true,
+                    ParameterSetName='URL'
+        )]
+        [string[]]$DownloadLink,
+
+        [Parameter(Mandatory=$true,ParameterSetName='ID')]
+        [Parameter(Mandatory=$true,ParameterSetName='URL')]
         [string]$DestPath,
 
-        [Parameter(Mandatory=$false,ParameterSetName='Archive')]
+        [Parameter(Mandatory=$false,ParameterSetName='ID')]
+        [Parameter(Mandatory=$false,ParameterSetName='URL')]
         [switch]$Extract,
 
-        [Parameter(Mandatory=$false,ParameterSetName='Archive')]
+        [Parameter(Mandatory=$false,ParameterSetName='ID')]
+        [Parameter(Mandatory=$false,ParameterSetName='URL')]
         [switch]$Cleanup,
 
         [switch]$Force,
@@ -260,116 +405,109 @@ function Get-MSFTLink {
         ## Get the name of this function
         [string]${CmdletName} = $PSCmdlet.MyInvocation.MyCommand.Name
 
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        If($PsCmdlet.ParameterSetName -eq 'ID'){
+            $MSFTLinkParams = @{}
+            If($LinkID){
+               $MSFTLinkParams += @{LinkID = $LinkID}
+            }
+            If($Filter){
+                $MSFTLinkParams += @{Filter = $Filter}
+            }
+            If($Language){
+                $MSFTLinkParams += @{Language = $Language}
+            }
+            Write-Verbose ("{0} : Attempting to get links: [{1}]..." -f ${CmdletName},($LinkID -join ','))
+            $DownloadLink = Get-MSFTLink @MSFTLinkParams | Select -ExpandProperty DownloadLink
+        }
 
-        [System.Uri]$SourceURL = "https://www.microsoft.com/$Language/download"
-        [string]$DownloadURL = "https://download.microsoft.com/download"
+        $DownloadCollection = @()
 
-        $DownloadData = @()
+        ## -------- BUILD ROOT FOLDER ----------
+        If( !(Test-Path $DestPath)){
+            New-Item $DestPath -type directory -ErrorAction SilentlyContinue | Out-Null
+        }
+
     }
     Process
     {
+        Write-Verbose ("{0} : Processing download link: [{1}]..." -f ${CmdletName},$DownloadLink)
+        #TESTS $Link = $DownloadLink[0]
+        Foreach($Link in $DownloadLink)
+        {
+            #Build collection object
+            $Data = '' | Select DownloadURL,FileName,FilePath,Downloaded,Extracted,Removed
+            $Data.DownloadURL = $Link
 
-        Try{
-            ## -------- FIND FILE LINKS ----------
-            $ConfirmationLink = $SourceURL.OriginalString + "/confirmation.aspx?id=$LinkID"
-            Write-Verbose ("{0} : Grabbing links from [{1}]..." -f ${CmdletName},$ConfirmationLink)
+            $Filename = $Link | Split-Path -Leaf
+            $destination = Join-Path $DestPath -ChildPath $Filename
+            #collect data
+            $Data.FileName = $Filename
+            $Data.FilePath = $destination
 
-            $ConfirmationContent = Invoke-WebRequest $ConfirmationLink -UseBasicParsing -ErrorAction Stop
-            $OfficialDownloads = Get-HrefMatches -content [string]$ConfirmationContent  | Where-Object {$_ -match $DownloadURL} | Select-Object -Unique
-
-            #Filter
-            If($Filter){
-                $OfficialDownloads = $OfficialDownloads | Where-Object {$_ -like "*$Filter*"}
-                Write-Verbose ("{0} : Found {1} official downloadable links with filter [{2}]" -f ${CmdletName},$OfficialDownloads.Count,$Filter)
-            }Else{
-                Write-Verbose ("{0} : Found {1} official downloadable links" -f ${CmdletName},$OfficialDownloads.Count)
+            ## -------- DOWNLOAD  ----------
+            $Data.Downloaded = $False
+            If( (Test-Path $destination) -and !$Force){
+                Write-Verbose ("{0} : File already exists: [{1}]..." -f ${CmdletName},$Filename)
+                $Data.Downloaded = $True
+                #Continue
+            }
+            Else{
+                Try{
+                    Write-Verbose ("{0} : Attempting to download: [{1}]..." -f ${CmdletName},$Filename)
+                    If($PSBoundParameters.ContainsKey('NoProgress') )
+                    {
+                        Invoke-WebRequest -Uri $Data.DownloadURL -OutFile $destination -UseBasicParsing -ErrorAction Stop
+                    }
+                    Else{
+                        Initialize-FileDownload -Name ("{0}" -f $Filename) -Url $Data.DownloadURL -TargetDest $destination
+                    }
+                    Write-Verbose ("{0} : Successfully downloaded: {1}" -f ${CmdletName},$destination)
+                    $Data.Downloaded = $True
+                }
+                Catch {
+                    Write-Error ("{0} : Failed downloading [{1}]: {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
+                }
             }
 
-            ## -------- BUILD ROOT FOLDER ----------
-            If( !(Test-Path $DestPath)){
-                New-Item $DestPath -type directory -ErrorAction SilentlyContinue | Out-Null
-            }
 
-            #TESTS $link = $OfficialDownloads[0]
-            Foreach($link in $OfficialDownloads)
+            ## -------- EXTRACT ----------
+            $Data.Extracted = $False
+            If($PSBoundParameters.ContainsKey('Extract'))
             {
-                #Build collection object
-                $Data = '' | Select LinkID,DownloadableLink,FileName,FilePath,Extracted,Removed
-                $Data.LinkID = $ConfirmationLink
-                $Data.DownloadableLink = $link
-
-                $Filename = $link | Split-Path -Leaf
-                $destination = Join-Path $DestPath -ChildPath $Filename
-                #collect data
-                $Data.FileName = $Filename
-                $Data.FilePath = $destination
-
-                ## -------- DOWNLOAD  ----------
-                If( (Test-Path $destination) -and !$Force){
-                    Write-Verbose ("{0} : File already exists: [{1}]..." -f ${CmdletName},$Filename)
-                    #Continue
-                }
-                Else{
-                    Try{
-                        Write-Verbose ("{0} : Attempting to download: [{1}]..." -f ${CmdletName},$Filename)
-                        If($PSBoundParameters.ContainsKey('NoProgress') )
-                        {
-                            Invoke-WebRequest -Uri $link -OutFile $destination -UseBasicParsing -ErrorAction Stop
-                        }
-                        Else{
-                            Initialize-FileDownload -Name ("{0}" -f $Filename) -Url $link -TargetDest $destination
-                        }
-                        Write-Verbose ("{0} : Successfully downloaded: {1}" -f ${CmdletName},$destination)
-                    }
-                    Catch {
-                        Write-Error ("{0} : Failed downloading [{1}]: {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
-                    }
-                }
-
-                ## -------- EXTRACT ----------
-                If($PSBoundParameters.ContainsKey('Extract'))
-                {
-                    $File = Split-path $destination -Leaf
-                    Try{
-                        Write-Verbose ("{0} : Attempting to Extract file [{1}] to [{2}]" -f ${CmdletName},$destination,$DestPath)
-                        If([System.IO.Path]::GetExtension($File) -eq '.zip'){
-                            Expand-Archive -LiteralPath "$destination" -DestinationPath $DestPath -Force -ErrorAction Stop
-                        }
-                        #Assume if executable and extract is used; its an extractable file
-                        If([System.IO.Path]::GetExtension($File) -eq '.exe'){
-                            Start-Process -FilePath $destination -ArgumentList "/extract:$DestPath /quiet" -Wait -ErrorAction Stop
-                        }
+                $File = Split-path $destination -Leaf
+                Try{
+                    Write-Verbose ("{0} : Attempting to Extract file [{1}] to [{2}]" -f ${CmdletName},$destination,$DestPath)
+                    If([System.IO.Path]::GetExtension($File) -eq '.zip'){
+                        Expand-Archive -LiteralPath "$destination" -DestinationPath $DestPath -Force -ErrorAction Stop
                         $Data.Extracted = $True
                     }
-                    catch {
-                        $Data.Extracted = $False
-                        Write-Error ("{0} : Unable to download [{1}]. {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
+                    #Assume if executable and extract is used; its an extractable file
+                    If([System.IO.Path]::GetExtension($File) -eq '.exe'){
+                        $result = Start-Process -FilePath $destination -ArgumentList "/extract:$DestPath /quiet" -Wait -ErrorAction Stop -PassThru
+                        If($result.ExitCode -eq 0){$Data.Extracted = $True}
                     }
                 }
-
-                ## -------- REMOVE ARCHIVE ----------
-                If($PSBoundParameters.ContainsKey('Cleanup') -and $Data.Extracted)
-                {
-                    Write-Verbose ("{0} : Removing file [{0}]" -f ${CmdletName},$destination,${CmdletName})
-                    Remove-Item $destination -Force -ErrorAction Stop | Out-Null
-                    $Data.Removed = $True
-                }Else{
-                    $Data.Removed = $False
+                catch {
+                    Write-Error ("{0} : Unable to download [{1}]. {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
                 }
+            }
 
-                #add data to array
-                $DownloadData += $Data
-            } #end loop
-        }
-        catch {
-            Write-Error ("{0} : Unable to download [{1}]. {2}" -f ${CmdletName},$Filter,$_.Exception.Message)
-        }
+            ## -------- REMOVE ARCHIVE ----------
+            $Data.Removed = $False
+            If($PSBoundParameters.ContainsKey('Cleanup') -and $Data.Extracted)
+            {
+                Write-Verbose ("{0} : Removing file [{0}]" -f ${CmdletName},$destination,${CmdletName})
+                Remove-Item $destination -Force -ErrorAction SilentlyContinue | Out-Null
+                $Data.Removed = $True
+            }
 
+            #add data to array
+            $DownloadCollection += $Data
+        } #end loop
     }
     End{
         If($PSBoundParameters.ContainsKey('Passthru')){
-            return $DownloadData
+            return $DownloadCollection
         }
     }
 }
@@ -377,6 +515,7 @@ function Get-MSFTLink {
 $exportModuleMemberParams = @{
     Function = @(
         'Get-MSFTLink'
+        'Invoke-MsftLinkDownload'
     )
 }
 
