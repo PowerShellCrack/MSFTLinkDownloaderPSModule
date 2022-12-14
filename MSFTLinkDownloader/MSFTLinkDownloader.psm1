@@ -50,7 +50,7 @@ Function Get-WebContentHeader{
     #https://stackoverflow.com/questions/41602754/get-website-metadata-such-as-title-description-from-given-url-using-powershell
     [CmdletBinding()]
     param(
-        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true,Position=1,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
         #[Microsoft.PowerShell.Commands.HtmlWebResponseObject]$WebContent,
         $WebContent,
 
@@ -91,10 +91,10 @@ Function Initialize-FileDownload {
          [Alias("Title")]
          [string]$Name,
 
-         [Parameter(Mandatory=$true,Position=0)]
+         [Parameter(Mandatory=$true,Position=1)]
          [string]$Url,
 
-         [Parameter(Mandatory=$true,Position=1)]
+         [Parameter(Mandatory=$true,Position=2)]
          [Alias("TargetDest")]
          [string]$TargetFile
      )
@@ -197,6 +197,19 @@ function Get-ZipFileSize {
     return $Zipdata
 }
 
+function Expand-ShortLink {
+    param (
+        [Parameter(Mandatory=$true,Position=1,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        [string]$ShortLink
+    )
+    Try{
+        $RedirectedURI = [System.Net.HttpWebRequest]::Create($ShortLink).GetResponse().ResponseUri.AbsoluteUri
+    }Catch{
+        $RedirectedURI = $Null
+    }
+    Return $RedirectedURI
+}
+
 # MICROSOFT DOWNLOAD
 #==================================================
 function Get-MsftLink {
@@ -213,6 +226,9 @@ function Get-MsftLink {
         .PARAMETER LinkID
         Required. Link id from download url
 
+        .PARAMETER ShortLink
+        Required. Use short link to pull link id from download url
+
         .PARAMETER Filter
         Filter to reduce files found in link
 
@@ -220,7 +236,7 @@ function Get-MsftLink {
         Defaults to en-US. English.
 
         .EXAMPLE
-        Get-MsftLink -LinkID '49117','104223'
+        Get-MsftLink -LinkID '49117','104223','844652'
 
         .EXAMPLE
         Get-MsftLink -LinkID '55319' -Filter 'LGPO'
@@ -231,13 +247,16 @@ function Get-MsftLink {
         .LINK
         Get-HrefMatches
     #>
-    [CmdletBinding()]
+    [CmdletBinding(DefaultParameterSetName='ID')]
     [OutputType([PSCustomObject])]
     param(
-        [Parameter(Mandatory=$true,Position=0,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true)]
+        [Parameter(Mandatory=$true,Position=1,ValueFromPipeline=$true,ValueFromPipelineByPropertyName=$true,ParameterSetName='ID')]
         [int[]]$LinkID,
 
-        [parameter(Mandatory=$false,Position=1)]
+        [Parameter(Mandatory=$true,Position=1,ParameterSetName='Short')]
+        [string]$ShortLink,
+
+        [parameter(Mandatory=$false,Position=2)]
         [string]$Filter,
 
         [ValidateSet('en-us','en-gb','en-sg','en-au')]
@@ -252,11 +271,19 @@ function Get-MsftLink {
         [System.Uri]$SourceURL = "https://www.microsoft.com/$Language/download"
         [string]$DownloadURL = "https://download.microsoft.com/download"
 
+        
         $LinkCollection = @()
     }
     Process
     {
+        If($PsCmdlet.ParameterSetName -eq 'Short'){
+            $RealLink = Expand-ShortLink -ShortLink $ShortLink
+            $Null = $RealLink -match '\d+$'
+            $LinkID = $Matches[0]
+        }
+
         Foreach($ID in $LinkID){
+            
             Try{
                 ## -------- FIND FILE LINKS ----------
                 $ConfirmationLink = $SourceURL.OriginalString + "/confirmation.aspx?id=$ID"
@@ -330,9 +357,6 @@ Function Invoke-MsftLinkDownload {
         .PARAMETER Force
         Re-downloads file even if it exists (overwrites)
 
-        .PARAMETER NoDownload
-        Export downloaded information as object
-
         .PARAMETER NoProgress
         Shows no progress during download (this is useful for large file sizes and speed)
 
@@ -341,6 +365,7 @@ Function Invoke-MsftLinkDownload {
 
         .EXAMPLE
         Invoke-MsftLinkDownload -LinkID 49117 -DestPath C:\temp\Downloads -Force
+        Invoke-MsftLinkDownload -DownloadLink  -DestPath C:\temp\Downloads -Force
 
         .EXAMPLE
         Invoke-MsftLinkDownload -LinkID 55319,104223 -Filter 'Server' -DestPath C:\temp\Downloads -Force -verbose
@@ -352,7 +377,7 @@ Function Invoke-MsftLinkDownload {
         Invoke-MsftLinkDownload -DownloadLink 'https://download.microsoft.com/download/8/5/C/85C25433-A1B0-4FFA-9429-7E023E7DA8D8/LGPO.zip' -DestPath C:\temp\Downloads -Force -Extract -Cleanup
 
         .EXAMPLE
-        Get-MsftLink -LinkID 49117,104223 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
+        Get-MsftLink -LinkID 49117,104223,844652 | Invoke-MsftLinkDownload -DestPath C:\temp\Downloads -Passthru
 
         .EXAMPLE
         $Links = Get-MsftLink -LinkID 49117,55319,104223
@@ -365,7 +390,7 @@ Function Invoke-MsftLinkDownload {
     #>
     [CmdletBinding(DefaultParameterSetName='URL')]
     param(
-        [Parameter(Mandatory=$true,Position=0,ParameterSetName='ID')]
+        [Parameter(Mandatory=$true,Position=1,ParameterSetName='ID',ValueFromPipelineByPropertyName=$true)]
         [int[]]$LinkID,
 
         [Parameter(Mandatory=$false,ParameterSetName='ID')]
@@ -376,7 +401,7 @@ Function Invoke-MsftLinkDownload {
         [string]$Language = "en-us",
 
         [Parameter(Mandatory=$true,
-                    Position=0,
+                    Position=1,
                     ValueFromPipeline=$true,
                     ValueFromPipelineByPropertyName=$true,
                     ParameterSetName='URL'
@@ -405,28 +430,35 @@ Function Invoke-MsftLinkDownload {
         ## Get the name of this function
         [string]${CmdletName} = $PSCmdlet.MyInvocation.MyCommand.Name
 
+        ## -------- BUILD ROOT FOLDER ----------
+        If( !(Test-Path $DestPath)){
+            New-Item $DestPath -type directory -ErrorAction SilentlyContinue | Out-Null
+        }
+
         If($PsCmdlet.ParameterSetName -eq 'ID'){
+            $DownloadLink = @()
             $MSFTLinkParams = @{}
-            If($LinkID){
-               $MSFTLinkParams += @{LinkID = $LinkID}
+            $LinkIds=@()
+            Foreach($Id in $LinkID){
+                If($Id){
+                    $LinkIds += $Id
+                }
             }
+            If($LinkID){
+                $MSFTLinkParams += @{LinkID = ($LinkIds -join ',')}
+             }
             If($Filter){
                 $MSFTLinkParams += @{Filter = $Filter}
             }
             If($Language){
                 $MSFTLinkParams += @{Language = $Language}
             }
-            Write-Verbose ("{0} : Attempting to get links: [{1}]..." -f ${CmdletName},($LinkID -join ','))
-            $DownloadLink = Get-MsftLink @MSFTLinkParams | Select -ExpandProperty DownloadLink
+            
+            Write-Verbose ("{0} : Attempting to get links: [{1}]..." -f ${CmdletName},($LinkIds -join ','))
+            $DownloadLink += Get-MsftLink @MSFTLinkParams | Select -ExpandProperty DownloadLink
         }
 
         $DownloadCollection = @()
-
-        ## -------- BUILD ROOT FOLDER ----------
-        If( !(Test-Path $DestPath)){
-            New-Item $DestPath -type directory -ErrorAction SilentlyContinue | Out-Null
-        }
-
     }
     Process
     {

@@ -1,5 +1,14 @@
 # Change log for MSFTLinkDownloader module
 
+## 1.0.0.6 December 14, 2022
+
+- Added shortlink priavate funtion; convert to redirected url
+- Add functionality for Get-MSFTLink to use shortlink
+
+## 1.0.0.5 August 29, 2022
+
+- Fixed positional parameter; set 0 to 1
+
 ## 1.0.0.4 June 08, 2022
 
 - Changed Get-MSFTLink to just link retrieval; replaced with Invoke-MSFTLinkDownload
