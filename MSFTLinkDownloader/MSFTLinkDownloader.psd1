@@ -100,7 +100,7 @@
             Tags = @('Web','Downloader','LinkID','Products','WebRequest','Extractor','aka.ms')
 
             # A URL to the license for this module.
-            LicenseUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule/LICENSE'
+            LicenseUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSModule/blob/main/LICENSE'
 
             # A URL to the main website for this project.
             ProjectUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule'
@@ -112,7 +112,7 @@
     }
 
     # HelpInfo URI of this module
-    HelpInfoURI = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule/README.md'
+    HelpInfoURI = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSModule/blob/main/README.md'
 
     # Default prefix for commands exported from this module. Override the default prefix using Import-Module -Prefix.
     # DefaultCommandPrefix = ''
