@@ -97,16 +97,16 @@
 
         PSData = @{
             # Tags applied to this module. These help with module discovery in online galleries.
-            Tags = @('Web','Downloader','LinkID','Products','WebRequest','Extractor')
+            Tags = @('Web','Downloader','LinkID','Products','WebRequest','Extractor','aka.ms')
 
             # A URL to the license for this module.
-            LicenseUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule/LICENSE.txt'
+            LicenseUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule/LICENSE'
 
             # A URL to the main website for this project.
             ProjectUri = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule'
 
             # ReleaseNotes of this module
-            ReleaseNotes = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSmodule/CHANGELOG.MD'
+            ReleaseNotes = 'https://github.com/PowerShellCrack/MSFTLinkDownloaderPSModule/blob/main/MSFTLinkDownloader/CHANGELOG.MD'
         }
 
     }
