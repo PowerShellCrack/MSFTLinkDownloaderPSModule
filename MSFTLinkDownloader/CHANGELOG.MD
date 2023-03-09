@@ -5,6 +5,10 @@
 - Added shortlink priavate funtion; convert to redirected url
 - Add functionality for Get-MSFTLink to use shortlink
 
+## 1.0.0.7 March 8, 2023
+
+- Added new module manifest
+
 ## 1.0.0.5 August 29, 2022
 
 - Fixed positional parameter; set 0 to 1
